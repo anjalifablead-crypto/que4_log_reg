@@ -232,6 +232,8 @@
                         // Handle hobby checkboxes
                         $('input[name="hobby[]"]').prop('checked', false); // Uncheck all first
 
+
+                        
                         if (user.hobby) {
                             // Split by comma and trim spaces
                             let hobbies = user.hobby.split(',').map(h => h.trim());
