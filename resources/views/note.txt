@@ -1,0 +1,264 @@
+<script>
+        $(document).on("submit", "#loginForm", function(e) {
+            e.preventDefault();
+            let formData = new FormData(this);
+
+            $.ajax({
+                url: "/login",
+                type: "POST",
+                data: formData,
+                contentType: false,
+                processData: false,
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(res) {
+                    localStorage.setItem("auth_token", res.token);
+                    Swal.fire({
+                        title: "Login",
+                        text: "Login Successfully!.",
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        localStorage.setItem("auth_token", res.token);
+                        window.location.href = '/profile';
+                    });
+                    $("#loginForm")[0].reset();
+                },
+                error: function(xhr) {
+                    if (xhr.status === 422) {
+                        $('.error-text').text('');
+                        $.each(xhr.responseJSON.errors, function(key, value) {
+                            let errorClass = key.replace(/\./g, '_') + "_error";
+                            $('.' + errorClass).text(value[0]);
+                        });
+                        $(document).on('input change', 'input, select', function() {
+                            let fieldName = $(this).attr('name'); // get field name
+                            let errorClass = fieldName.replace(/\./g, '_') + "_error";
+                            $('.' + errorClass).text(''); // clear the error
+                        });
+                    } else {
+                        Swal.fire({
+                            title: "Login Failed",
+                            text: "Invalid credentials. Please try again.",
+                            icon: "error",
+                        });
+                    }
+                }
+            });
+        });
+    </script>
+
+
+    <!DOCTYPE html>
+    <html>
+
+    <head>
+        <meta charset="UTF-8" meta name="csrf-token" content="{{ csrf_token() }}">
+        <title>User Profile</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    </head>
+
+    <body class="container mt-5">
+
+        <h2 class="mb-4">User Profile</h2>
+
+        <div class="card p-4" id="profileCard" style="display:none;">
+            <div class="row">
+                <div class="col-md-3">
+                    <img id="userImage" src="" alt="Profile Image" class="img-fluid rounded-circle">
+                </div>
+                <div class="col-md-9">
+                    <p><strong>Name:</strong> <span id="userName"></span></p>
+                    <p><strong>Email:</strong> <span id="userEmail"></span></p>
+                    <p><strong>Age:</strong> <span id="userAge"></span></p>
+                    <p><strong>Gender:</strong> <span id="userGender"></span></p>
+                    <p><strong>Hobby:</strong> <span id="userHobby"></span></p>
+                    <p><strong>City:</strong> <span id="userCity"></span></p>
+                </div>
+            </div>
+        </div>
+        <form id="logoutForm">
+            @csrf
+            <button type="submit" class="btn btn-danger">Logout</button>
+        </form>
+
+        <div id="errorMsg" class="alert alert-danger" style="display:none;">
+            You are not logged in. Please <a href="/">login</a>.
+        </div>
+
+        <script>
+            $(document).ready(function() {
+                let token = localStorage.getItem("auth_token");
+                $.ajax({
+                    url: "/api/profile1",
+                    type: "GET",
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("auth_token"),
+                    },
+                    success: function(res) {
+                        res = res.user;
+                        $("#profileCard").show();
+                        $("#userName").text(res.uname);
+                        $("#userEmail").text(res.email);
+                        $("#userAge").text(res.age);
+                        $("#userGender").text(res.gender);
+                        $("#userHobby").text(res.hobby);
+                        $("#userCity").text(res.city);
+
+                        if (res.image) {
+                            $("#userImage").attr("src", "/uploads/" + res.image);
+                        } else {
+                            $("#userImage").attr("src", "https://via.placeholder.com/150");
+                        }
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 401) {
+                            // Token expired or invalid
+                            $("#errorMsg").show().text("Session expired... Please login again.");
+                            localStorage.removeItem("auth_token"); // clear old token
+                        }
+                    }
+                });
+                $(document).on("submit", "#logoutForm", function(e) {
+                    e.preventDefault();
+                    $.ajax({
+                        url: "/logout",
+                        type: "POST",
+                        data: {
+                            _token: "{{ csrf_token() }}", // Send CSRF token as data
+                        },
+                        headers: {
+                            "Authorization": "Bearer " + localStorage.getItem("auth_token"),
+                        },
+                        // headers: {
+                        //     "Authorization": "Bearer " + localStorage.getItem("token"), // send stored token
+                        // },
+                        success: function(res) {
+                            // Clear token from storage
+                            localStorage.removeItem("token");
+
+                            // Redirect to login page
+                            window.location.href = "/";
+                        },
+                        error: function() {
+                            alert("Logout failed!");
+                        }
+                    });
+                });
+            });
+        </script>
+
+    </body>
+
+    </html>
+
+
+
+    <script>
+        $(document).ready(function() {
+            const token = localStorage.getItem("auth_token");
+
+            // Fetch user profile
+            $.ajax({
+                url: "/api/profile1",
+                type: "GET",
+                headers: {
+                    "Authorization": "Bearer " + token,
+                },
+                success: function(res) {
+                    const user = res.user;
+                    $("#userName").text(user.uname);
+                    $("#userEmail").text(user.email);
+                    $("#userAge").text(user.age);
+                    $("#userGender").text(user.gender);
+                    $("#userHobby").text(user.hobby);
+                    $("#userCity").text(user.city);
+
+                    if (user.image) {
+                        $("#userImage").attr("src", "/uploads/" + user.image);
+                    }
+
+                    // Pre-fill update form
+                    $.each(user, function(key, value) {
+                        $('[name="' + key + '"]').val(value);
+                    });
+                    
+                },
+                error: function(xhr) {
+                    if (xhr.status === 401) {
+                        $("#errorMsg").show();
+                        localStorage.removeItem("auth_token");
+                    }
+                }
+            });
+           
+
+            // Edit button
+            $("#editProfile").click(function() {
+                $(".view-section").hide();
+                $(".update-section").fadeIn();
+            });
+
+            // Cancel button
+            $("#cancelEdit").click(function() {
+                $(".update-section").hide();
+                $(".view-section").fadeIn();
+            });
+
+            // Update form submit
+            $(document).on("submit", "#updateForm", function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+
+                $.ajax({
+                    url: "/api/profile-update",
+                    type: "POST",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        "Authorization": "Bearer " + token,
+                    },
+                    success: function(res) {
+                        Swal.fire({
+                            title: "Updated!",
+                            text: "Profile updated successfully.",
+                            icon: "success",
+                            timer: 1500,
+                            showConfirmButton: false,
+                        });
+                        $(".update-section").hide();
+                        $(".view-section").fadeIn();
+                        location.reload();
+                    },
+                    error: function() {
+                        Swal.fire("Error", "Something went wrong!", "error");
+                    }
+                });
+            });
+
+            // Logout
+            $("#logoutBtn").click(function() {
+                $.ajax({
+                    url: "/logout",
+                    type: "POST",
+                    data: {
+                        _token: "{{ csrf_token() }}"
+                    },
+                    headers: {
+                        "Authorization": "Bearer " + token,
+                    },
+                    success: function() {
+                        localStorage.removeItem("auth_token");
+                        window.location.href = "/";
+                    },
+                    error: function() {
+                        Swal.fire("Error", "Logout failed", "error");
+                    }
+                });
+            });
+        });
+    </script>
